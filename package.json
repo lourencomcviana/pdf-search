@@ -1,0 +1,14 @@
+{
+  "name": "search-pdf",
+  "version": "1.0.0",
+  "description": "node app that points pdfs that contains a string",
+  "main": "search.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "lourenco.viana",
+  "license": "ISC",
+  "dependencies": {
+    "pdf2json": "^1.1.7"
+  }
+}
