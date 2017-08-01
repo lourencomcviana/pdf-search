@@ -57,3 +57,7 @@ typings/
 # dotenv environment variables file
 .env
 
+#generated files/directories
+search.result.json
+pdfs/
+pdf2json/
