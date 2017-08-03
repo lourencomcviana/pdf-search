@@ -1,34 +1,22 @@
  var fs = require('fs'),
   PDFParser = require("pdf2json");
-//var readline = require('readline');
-
 var fsq= require('./src/fsq');
+var Promise = require("bluebird");
 
-var pdf2jsonFolder='pdf2json';
-var loadedFiles;
-var jsonFiles;
-
-var termoList=["2016570017631",2016570017620,2016570026065]
 
 console.log('iniciando app');
+
 var search=new Search();
 
-var termo=search.loadTermsFromFile('search.json');
-
-var json=search.pdfToJsonSource('pdfs/../*.pdf',"pdf2json");
-
-//busca
-Promise.all([json,termo])
-  .then(function(data){
-    console.log('Iniciando busca')
-    return find(data[0],data[1]);
-  },showPromissseError)
-  .then(function(data){
-    console.log('escrevendo arquivo')
-    return fsq.writeFile("./search.result.json", JSON.stringify(data,null,2))
-  },showPromissseError).then(function(){
-    console.log('terminou!');
-  },showPromissseError)
+var jsonFiles='pdf2json';
+//node search.js -c pdfs/**/*.pdf
+if(process.argv[2]=='-c'){
+  search.pdfToJsonSource(process.argv[3],jsonFiles)
+}else{
+  search.runSearch(jsonFiles)
+}
+//;
+//search.runSearch();
 
 function Search(){
   
@@ -39,6 +27,22 @@ function Search(){
     json:[],
     pdf:[]
   };
+
+  this.runSearch = function(){
+    var termo=search.loadTermsFromFile('search.json');
+    var json=search.loadJsonSources('pdf2json/**/*.json');
+    Promise.all([json,termo])
+    .then(function(data){
+      console.log('Iniciando busca')
+      return report(data[0],data[1]);
+    },showPromissseError)
+    .then(function(data){
+      console.log('escrevendo arquivo')
+      return fsq.writeFile("./search.report.json", JSON.stringify(data,null,2))
+    },showPromissseError).then(function(){
+      console.log('terminou!');
+    },showPromissseError)
+  }
 
   this.loadTermsFromFile=function(file){
     var promisse=fsq.readFile(file).then(
@@ -57,12 +61,14 @@ function Search(){
   };
 
   this.loadJsonSources=function(globPath){
-    this.sources=fsq.readFilesGlob(globPath,{nocase:true}).then(
+    this.sources=fsq.readFilesGlob(globPath,{nocase:true,
+      format:function(data){
+        data.file=JSON.parse(data.file)
+        return data;
+      }
+    },function(progress){progress.show()}).then(
       function(files){
-        // console.log('buscando por aquivos processados');
-        for(var id in files){
-          files[id].file=JSON.parse(files[id].file);
-        }
+
         return files;
         
       },showPromissseError
@@ -71,8 +77,8 @@ function Search(){
   }
 
   this.pdfToJsonSource=function(globPath,savePath){
-    var sources=search.loadJsonSources(savePath+'/*.json');
-    
+   
+    var sources=search.loadJsonSources(savePath+'/**/*.json');
     if(sources){
       var writePromisse= sources.then(function(sourceFiles){
         return readPdfWriteJson(sourceFiles);
@@ -89,34 +95,68 @@ function Search(){
     }
 
     function readPdfWriteJson(alredyReadFiles){
+      console.log('reading  pdf');
+
+      //lista de pdfs que não precisam ser lidos denovo
+      exceptions=[];
+      for(var id in alredyReadFiles.paging.files){
+        var jsonFileName=alredyReadFiles.paging.files[id];
+
+        let name=jsonFileName.substr(0,jsonFileName.length-5);
+
+        name=name.substr(savePath.length+1);
+        exceptions.push(name);
+      }
 
       let writePromisses=
-      fsq.readFilesGlob(globPath,{nocase:true}).then(
-        function(files){
-          resetProgress(files)
-          var promisses=[];
-          for(var id in files){
-            if(!alredyReadFiles.find(
-              function(obj){
-                return obj.name==files[id].name+'.json';
-              })
-            ){
+      fsq.readFilesGlob(globPath,
+        {
+          exceptions:exceptions,
+          nocase:true,
+          format:function(data){
+            return parsePdf(data.file,data)
+              .then(function(parsedPdf){
 
-              promisses.push(
-                parsePdf(files[id].file,files[id].name)
-                .then(function(parsedPdf){
-                  runProgress('convertendo pdf')
-                  //the promise of the writem file dosent matter since we have the result right here
-                  var writeData=JSON.stringify(parsedPdf.json,null,2);
-                  console.log("./"+savePath+parsedPdf.name+".json");
-                  fsq.writeFile("./"+savePath+'/'+parsedPdf.name+".json", writeData);
-                  
-                  return parsedPdf.json;
-                },showPromissseError)
-              );
+                if(typeof parsedPdf.file=='string')
+                  parsedPdf.file=JSON.parse(parsedPdf.file);
+                parsedPdf.filePathStr="./"+savePath+'/'+parsedPdf.filePathStr+".json";
+                return parsedPdf;
+              },showPromissseError)
+          }
+        },
+        function(progress){
+          progress.show();
+        }
+      ).then(
+        function(files){
+
+          var writePromisses=[]
+
+          write(files)
+
+          function write(files){
+            if(files.length>0){
+              return Promise.all(files).then(function(data){
+                console.log('escrevendo página: '+files.paging.current+' de '+files.paging.total)
+                fsq.writeFiles(data,
+                  function(data){
+                    return JSON.stringify(data,null,2);
+                  }
+                  ,
+                  function(report){
+                    report.show()
+                  }
+                ).then(function(){
+                  if(files.paging.hasNext()){
+                    files.next();
+                    write(files);
+                  }
+                });
+              });
             }
           }
-          return Promise.all(promisses);
+
+          return files;
             
         },showPromissseError
       );
@@ -127,31 +167,51 @@ function Search(){
 }
 
 
-function find(jsonFiles,searchArray){
-  var termosFound={};
+function report(jsonFiles,searchArray){
 
-  resetProgress(jsonFiles)
-  for(var fileId in jsonFiles){
-    let file=jsonFiles[fileId].file;
-    runProgress('processando '+jsonFiles[fileId].name+' ')
-    
-    for(var id in file.formImage.Pages){
-      let page=file.formImage.Pages[id];
-      for(var idText in page.Texts){
-        let text=page.Texts[idText].R[0].T;
-        for(var idSearch in searchArray){
-          //if(text.match(searchArray[idSearch])){
-          if(text==(searchArray[idSearch])){
-            if(!termosFound[text])termosFound[text]=[];
-            if(termosFound[text].indexOf(jsonFiles[fileId].name)<0){
-                termosFound[text].push(jsonFiles[fileId].name);
+  //resetProgress(jsonFiles.paging.files);
+  var newListJson={}
+
+  var cagados=[];
+  do{
+ 
+    console.log('página: '+jsonFiles.paging.current+' de '+jsonFiles.paging.total)
+    for(var fileId in jsonFiles){
+      if(isNaN(fileId)) continue;
+      try{
+        //runProgress('processando '+jsonFiles[fileId].name)
+        let name=jsonFiles[fileId].filePath.slice(1).join("/");
+        name=name.substr(0,name.length-5);
+        if(!newListJson[jsonFiles[fileId].name]){
+          
+          newListJson[name]=[]
+        }
+        let file=jsonFiles[fileId].file;
+        
+        
+        for(var id in file.formImage.Pages){
+          let page=file.formImage.Pages[id];
+          for(var idText in page.Texts){
+            let text=page.Texts[idText].R[0].T;
+            
+            if(text=='N%C3%9AMERO%20DO%20TERMO%3A'){
+              text=page.Texts[(Number(idText)+1)].R[0].T;
+              newListJson[name].push(text)
             }
           }
         }
+      }catch(e){
+        
+        cagados.push({err:e,fileId:fileId});
       }
     }
+
+  } while(jsonFiles.next());
+  if(cagados.length>0){
+    console.log('ERROS!!!!')
+    //console.log(cagados);
   }
-  return termosFound;
+  return newListJson
 }
   
 
@@ -180,12 +240,13 @@ function showPromissseError(err){
 }
 
 
-function parsePdf(pdfBuffer,name){
+function parsePdf(pdfBuffer,fileInfo){
   return new Promise(function (fulfill, reject){
     var pdfParser = new PDFParser();
     pdfParser.on("pdfParser_dataError", errData =>  reject(errData ));
     pdfParser.on("pdfParser_dataReady", pdfData => {
-      fulfill({json:pdfData,name:name});
+      fileInfo.file=pdfData;
+      fulfill(fileInfo);
       //runProgress('processando arquivos pdf -> ');
     });
     pdfParser.parseBuffer(pdfBuffer);

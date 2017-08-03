@@ -9,6 +9,7 @@
   "author": "lourenco.viana",
   "license": "ISC",
   "dependencies": {
+    "bluebird": "^3.5.0",
     "glob": "^7.1.2",
     "pdf2json": "^1.1.7",
     "pdfreader": "^0.2.4"
