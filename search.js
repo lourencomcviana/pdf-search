@@ -9,11 +9,13 @@ console.log('iniciando app');
 var search=new Search();
 
 var jsonFiles='pdf2json';
+var reportFile='search.report.json'
+var resultFile='search.result.json'
 //node search.js -c pdfs/**/*.pdf
 if(process.argv[2]=='-c'){
   search.pdfToJsonSource(process.argv[3],jsonFiles)
 }else{
-  search.runSearch(jsonFiles)
+  search.makeReport(jsonFiles)
 }
 //;
 //search.runSearch();
@@ -28,17 +30,31 @@ function Search(){
     pdf:[]
   };
 
-  this.runSearch = function(){
-    var termo=search.loadTermsFromFile('search.json');
-    var json=search.loadJsonSources('pdf2json/**/*.json');
-    Promise.all([json,termo])
+  this.makeReport = function(){
+    //var termo=search.loadTermsFromFile('search.json');
+    search.loadJsonSources(jsonFiles+'/**/*.json')
     .then(function(data){
       console.log('Iniciando busca')
-      return report(data[0],data[1]);
+      return report(data);
     },showPromissseError)
     .then(function(data){
       console.log('escrevendo arquivo')
-      return fsq.writeFile("./search.report.json", JSON.stringify(data,null,2))
+      return fsq.writeFile("./"+reportFile, JSON.stringify(data,null,2))
+    },showPromissseError).then(function(){
+      console.log('terminou!');
+    },showPromissseError)
+  }
+
+  this.runSearch = function(){
+    var termo=search.loadTermsFromFile('search.json');
+    search.loadJsonSources(jsonFiles+'/**/*.json')
+    .then(function(data){
+      console.log('Iniciando busca')
+      return report(data);
+    },showPromissseError)
+    .then(function(data){
+      console.log('escrevendo arquivo')
+      return fsq.writeFile("./"+reportFile, JSON.stringify(data,null,2))
     },showPromissseError).then(function(){
       console.log('terminou!');
     },showPromissseError)
@@ -167,7 +183,7 @@ function Search(){
 }
 
 
-function report(jsonFiles,searchArray){
+function report(jsonFiles){
 
   //resetProgress(jsonFiles.paging.files);
   var newListJson={}
