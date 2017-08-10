@@ -8,12 +8,17 @@ console.log('iniciando app');
 
 var search=new Search();
 
+var defaultPdfPath='pdfs/**/*.pdf';
 var jsonFiles='pdf2json';
 var reportFile='search.report.json'
 var resultFile='search.result.json'
-//node search.js -c pdfs/**/*.pdf
+
 if(process.argv[2]=='-c'){
-  search.pdfToJsonSource(process.argv[3],jsonFiles)
+  var pdfPath=defaultPdfPath;
+  if(process.argv[3]){
+    pdfPath=process.argv[3];
+  }
+  search.pdfToJsonSource(pdfPath,jsonFiles)
 }else{
   search.makeReport(jsonFiles)
 }
@@ -91,6 +96,7 @@ function Search(){
     );
     return this.sources;
   }
+  
 
   this.pdfToJsonSource=function(globPath,savePath){
    
@@ -115,15 +121,16 @@ function Search(){
 
       //lista de pdfs que não precisam ser lidos denovo
       exceptions=[];
-      for(var id in alredyReadFiles.paging.files){
-        var jsonFileName=alredyReadFiles.paging.files[id];
+      if( alredyReadFiles.paging){
+        for(var id in alredyReadFiles.paging.files){
+          var jsonFileName=alredyReadFiles.paging.files[id];
 
-        let name=jsonFileName.substr(0,jsonFileName.length-5);
+          let name=jsonFileName.substr(0,jsonFileName.length-5);
 
-        name=name.substr(savePath.length+1);
-        exceptions.push(name);
+          name=name.substr(savePath.length+1);
+          exceptions.push(name);
+        }
       }
-
       let writePromisses=
       fsq.readFilesGlob(globPath,
         {
