@@ -4,7 +4,6 @@ var fsq= require('./src/fsq');
 var Promise = require("bluebird");
 
 
-console.log('iniciando app');
 
 var search=new Search();
 
@@ -19,11 +18,7 @@ if(process.argv[2]=='-c'){
     pdfPath=process.argv[3];
   }
   search.pdfToJsonSource(pdfPath,jsonFiles)
-}else{
-  search.makeReport(jsonFiles)
 }
-//;
-//search.runSearch();
 
 function Search(){
   
@@ -35,10 +30,13 @@ function Search(){
     pdf:[]
   };
 
-  this.makeReport = function(){
+  this.makeReport = function(jsonFiles){
     //var termo=search.loadTermsFromFile('search.json');
     search.loadJsonSources(jsonFiles+'/**/*.json')
     .then(function(data){
+      if(!data || !data.length || data.length==0){
+        throw new Error("nenhum dado encontrado em "+jsonFiles+" tente usar o argumento -c e apontar o diretorio do arquivo");
+      }
       console.log('Iniciando busca')
       return report(data);
     },showPromissseError)

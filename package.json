@@ -11,7 +11,7 @@
   "dependencies": {
     "bluebird": "^3.5.0",
     "glob": "^7.1.2",
-    "pdf2json": "^1.1.7",
+    "pdf2json": "^1.1.8",
     "pdfreader": "^0.2.4"
   }
 }
