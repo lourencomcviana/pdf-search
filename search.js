@@ -8,14 +8,20 @@ var Promise = require("bluebird");
 var search=new Search();
 
 var defaultPdfPath='pdfs/**/*.pdf';
-var jsonFiles='pdf2json';
-var reportFile='search.report.json'
-var resultFile='search.result.json'
+var defaultJsonFiles='pdf2json';
+
+
 
 if(process.argv[2]=='-c'){
   var pdfPath=defaultPdfPath;
+  var jsonFiles=defaultJsonFiles;
+  
   if(process.argv[3]){
     pdfPath=process.argv[3];
+  } 
+
+  if(process.argv[4]){
+    jsonFiles=process.argv[4];
   }
   search.pdfToJsonSource(pdfPath,jsonFiles)
 }
@@ -31,6 +37,7 @@ function Search(){
   };
 
   this.makeReport = function(jsonFiles){
+    var reportFile='search.report.json'
     //var termo=search.loadTermsFromFile('search.json');
     search.loadJsonSources(jsonFiles+'/**/*.json')
     .then(function(data){
