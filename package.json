@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "bluebird": "^3.5.0",
-    "glob": "^7.1.2",
+    "glob": "^13.0.6",
     "pdf2json": "^1.1.8",
     "pdfreader": "^0.2.4"
   }
